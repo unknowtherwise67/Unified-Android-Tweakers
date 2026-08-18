@@ -3,18 +3,10 @@
 MODPATH="${0%/*}"
 MODDIR="${0%/*}"
 
-# Apply-On-Pre/Post-Boot section
-while [ "$(getprop sys.boot_completed)" != "1" ]; do
-    sleep 60
-done
-while [ -z "$(pm path android 2>/dev/null)" ]; do
-    sleep 1
-done
-if [ "$(getprop sys.init.perf_lsm)" = "basic" ] || [ "$(getprop init.svc.goldfish-logcat)" = "running" ]; then
-    exit 0
-fi
+# Timeout until Apply-On-Pre/Post-Boot actions
+sleep 60
 
-# System Files Permissions.
+# System Files Permissions
 sleep 1
 if [ -f "$MODPATH/system_files_chmods-1.sh" ]; then
     sh "$MODPATH/system_files_chmods-1.sh"
@@ -114,7 +106,7 @@ sleep 1
 sleep 1
 [ -f "$MODPATH/system_cpu_gpu_power.sh" ] && sh "$MODPATH/system_cpu_gpu_power.sh"
 
-# System Files Permissions.
+# System Files Permissions
 sleep 1
 if [ -f "$MODPATH/system_files_chmods-2.sh" ]; then
     sh "$MODPATH/system_files_chmods-2.sh"
