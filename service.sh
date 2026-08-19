@@ -4,16 +4,22 @@ MODPATH="${0%/*}"
 MODDIR="${0%/*}"
 
 # Timeout until Apply-On-Pre/Post-Boot actions
-sleep 60
+while [ "$(getprop sys.boot_completed)" != "1" ]; do
+    sleep 60
+done
+while [ -z "$(pm path android 2>/dev/null)" ]; do
+    sleep 1
+done
+if [ "$(getprop sys.init.perf_lsm)" = "basic" ] || [ "$(getprop init.svc.goldfish-logcat)" = "running" ]; then
+    exit 0
+fi
 
 # System Files Permissions
-sleep 1
 if [ -f "$MODPATH/system_files_chmods-1.sh" ]; then
     sh "$MODPATH/system_files_chmods-1.sh"
 fi
 
 # OS System ResetProps
-sleep 1
 if [ -x "$(command -v resetprop)" ]; then
     change_prop() {
         local prop="$1"
@@ -52,7 +58,6 @@ if [ -x "$(command -v resetprop)" ]; then
     change_prop ro.warranty_bit "0"
     delete_prop ro.build.selinux
 fi
-sleep 1
 chmod 640 /sys/fs/selinux/enforce
 if [ -x "\$(command -v resetprop)" ]
 then
@@ -62,7 +67,6 @@ if [ -x "\$(command -v resetprop)" ] && [ -n "\$(resetprop ro.build.selinux)" ]
 then
 	resetprop --delete ro.build.selinux
 fi
-sleep 1
 resetprop -n -p init.svc.adb_root ""
 adbroot="$(getprop service.adb.root)"
 if [ -n "$adbroot" ]; then
@@ -70,26 +74,21 @@ if [ -n "$adbroot" ]; then
 fi
 
 # Android Device/Kernel ZRAM Swap Virtual Memory Modifications
-sleep 1
 ZRAM=/block/zram0
 swapoff /dev$ZRAM
-sleep 1
 DISKSIZEDEF=`cat /sys$ZRAM/disksize`
 DISKSIZE=
 #%MemTotalStr=`cat /proc/meminfo | grep MemTotal`
 #%MemTotal=${MemTotalStr:16:8}
 #%let VALUE="$MemTotal * VAR / 100"
 #%DISKSIZE=$VALUE\K
-sleep 1
 swapoff /dev$ZRAM
 echo 1 > /sys$ZRAM/reset
-sleep 1
 ALGODEF=`cat /sys$ZRAM/comp_algorithm`
 ALGO=
 [ "$ALGO" ] && echo "$ALGO" > /sys$ZRAM/comp_algorithm
 #oecho "$DISKSIZE" > /sys$ZRAM/disksize
 #omkswap /dev$ZRAM
-sleep 1
 PRIO=
 #o/system/bin/swapon /dev$ZRAM -p "$PRIO"\
 #o|| /vendor/bin/swapon /dev$ZRAM -p "$PRIO"\
@@ -97,17 +96,12 @@ PRIO=
 #o|| swapon /dev$ZRAM
 
 # Android Device/Kernel Settings/Parameters Modifications
-sleep 1
 [ -f "$MODPATH/system_settings.sh" ] && sh "$MODPATH/system_settings.sh"
-sleep 1
 [ -f "$MODPATH/system_governors.sh" ] && sh "$MODPATH/system_governors.sh"
-sleep 1
 [ -f "$MODPATH/system_kernel.sh" ] && sh "$MODPATH/system_kernel.sh"
-sleep 1
 [ -f "$MODPATH/system_cpu_gpu_power.sh" ] && sh "$MODPATH/system_cpu_gpu_power.sh"
 
 # System Files Permissions
-sleep 1
 if [ -f "$MODPATH/system_files_chmods-2.sh" ]; then
     sh "$MODPATH/system_files_chmods-2.sh"
 fi
