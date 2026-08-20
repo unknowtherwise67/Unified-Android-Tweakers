@@ -5,7 +5,7 @@ MODDIR="${0%/*}"
 
 # Timeout until Apply-On-Pre/Post-Boot actions
 while [ "$(getprop sys.boot_completed)" != "1" ]; do
-    sleep 60
+    sleep 1
 done
 while [ -z "$(pm path android 2>/dev/null)" ]; do
     sleep 1
@@ -17,6 +17,43 @@ fi
 # System Files Permissions
 if [ -f "$MODPATH/system_files_chmods-1.sh" ]; then
     sh "$MODPATH/system_files_chmods-1.sh"
+fi
+
+# Android Device/Kernel ZRAM Swap Virtual Memory Modifications
+ZRAM=/block/zram0
+DISKSIZEDEF=`cat /sys$ZRAM/disksize`
+DISKSIZE=
+#%MemTotal=`awk '/MemTotal/ {print $2}' /proc/meminfo`
+#%let VALUE="$MemTotal * VAR / 100"
+#%DISKSIZE=$VALUE\K
+SWAPOFF=false
+if grep -q /dev$ZRAM /proc/swaps; then
+  for i in `seq 1 20`; do
+    if swapoff /dev$ZRAM; then
+      SWAPOFF=true
+      break
+    fi
+    sleep 1
+  done
+  if grep -q /dev$ZRAM /proc/swaps; then
+    SWAPOFF=false
+  fi
+else
+  SWAPOFF=true
+fi
+ALGODEF=`cat /sys$ZRAM/comp_algorithm`
+ALGO=
+PRIODEF=`cat /proc/swaps | awk 'NR>1 {print $5}'`
+PRIO=
+if $SWAPOFF; then
+  echo 1 > /sys$ZRAM/reset
+  [ "$ALGO" ] && echo "$ALGO" > /sys$ZRAM/comp_algorithm
+#o  echo "$DISKSIZE" > /sys$ZRAM/disksize
+#o  mkswap /dev$ZRAM
+#o  /system/bin/swapon /dev$ZRAM -p "$PRIO"\
+#o  || /vendor/bin/swapon /dev$ZRAM -p "$PRIO"\
+#o  || /system/vendor/bin/swapon /dev$ZRAM -p "$PRIO"\
+#o  || swapon /dev$ZRAM
 fi
 
 # OS System ResetProps
@@ -72,28 +109,6 @@ adbroot="$(getprop service.adb.root)"
 if [ -n "$adbroot" ]; then
     resetprop -n -p service.adb.root ""
 fi
-
-# Android Device/Kernel ZRAM Swap Virtual Memory Modifications
-ZRAM=/block/zram0
-swapoff /dev$ZRAM
-DISKSIZEDEF=`cat /sys$ZRAM/disksize`
-DISKSIZE=
-#%MemTotalStr=`cat /proc/meminfo | grep MemTotal`
-#%MemTotal=${MemTotalStr:16:8}
-#%let VALUE="$MemTotal * VAR / 100"
-#%DISKSIZE=$VALUE\K
-swapoff /dev$ZRAM
-echo 1 > /sys$ZRAM/reset
-ALGODEF=`cat /sys$ZRAM/comp_algorithm`
-ALGO=
-[ "$ALGO" ] && echo "$ALGO" > /sys$ZRAM/comp_algorithm
-#oecho "$DISKSIZE" > /sys$ZRAM/disksize
-#omkswap /dev$ZRAM
-PRIO=
-#o/system/bin/swapon /dev$ZRAM -p "$PRIO"\
-#o|| /vendor/bin/swapon /dev$ZRAM -p "$PRIO"\
-#o|| /system/vendor/bin/swapon /dev$ZRAM -p "$PRIO"\
-#o|| swapon /dev$ZRAM
 
 # Android Device/Kernel Settings/Parameters Modifications
 [ -f "$MODPATH/system_settings.sh" ] && sh "$MODPATH/system_settings.sh"

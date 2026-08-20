@@ -23,63 +23,57 @@ ZRAM=$MODPATH/system_virtual_memory.sh
 if [ ! -f $ZRAM ]; then
   touch $ZRAM
 fi
-PROP=`grep_prop zram.resize $ZRAM`
+VAL=`grep_prop zram.resize $ZRAM`
 ZRAM=/block/zram0
-if [ "$PROP" == 0 ]; then
+FILE=/sys$ZRAM/disksize
+FILE2=/sys$ZRAM/comp_algorithm
+CUR=`cat $FILE`
+CUR2=`cat $FILE2`
+if [ "$VAL" == 0 ]; then
   ui_print "- System ZRAM/Swap Virtual Memory will be DISABLED."
-  LMK=false
+  ui_print ""
 else
-  FILE=/sys$ZRAM/disksize
+  MemTotal=`awk '/MemTotal/ {print $2}' /proc/meminfo`
   ui_print "- Modifying $FILE..."
   sed -i 's|#o||g' $MODPATH/service.sh
-  if echo "$PROP" | grep -q %; then
-    ui_print "- To $PROP of ZRAM/Swap Virtual Memory..."
-    PROP=`echo "$PROP" | sed 's|%||g'`
-    sed -i "s|VAR|$PROP|g" $MODPATH/service.sh
+  if echo "$VAL" | grep -q %; then
+    ui_print "  to $VAL of RAM size."
+    VAL=`echo "$VAL" | sed 's|%||g'`
+    let RES="$MemTotal * $VAL / 100 * 1024"
+    ui_print "  ($RES Byte)"
+    sed -i "s|VAR|$VAL|g" $MODPATH/service.sh
     sed -i 's|#%||g' $MODPATH/service.sh
-  elif [ "$PROP" ]; then
-    ui_print "- To $PROP of ZRAM/Swap Virtual Memory..."
-    sed -i "s|DISKSIZE=1G|DISKSIZE=$PROP|g" $MODPATH/service.sh
+  elif [ "$VAL" ]; then
+    ui_print "  to $VAL Byte."
+    sed -i "s|DISKSIZE=|DISKSIZE=$VAL|g" $MODPATH/service.sh
   else
-    ui_print "- To 1GBs of ZRAM/Swap Virtual Memory..."
+    ui_print "  to 100% of RAM size."
+    let RES="$MemTotal * 1024"
+    ui_print "  ($RES Byte)"
+    sed -i "s|VAR|100|g" $MODPATH/service.sh
+    sed -i 's|#%||g' $MODPATH/service.sh
   fi
-  PROP=`grep_prop zram.algo $ZRAM`
-  if [ "$PROP" ]; then
-    FILE=/sys$ZRAM/comp_algorithm
-    if grep -q "$PROP" $FILE; then
-      ui_print "- Modifying $FILE..."
-      ui_print "- To $PROP..."
-      sed -i "s|ALGO=|ALGO=$PROP|g" $MODPATH/service.sh
+  ui_print ""
+  VAL=`grep_prop zram.algo $ZRAM`
+  if [ "$VAL" ]; then
+    if grep -q "$VAL" $FILE2; then
+      ui_print "- Modifying $FILE2..."
+      ui_print "  to $VAL"
+      sed -i "s|ALGO=|ALGO=$VAL|g" $MODPATH/service.sh
     else
-      ui_print "! $PROP is Unsupported."
-      ui_print "  in $FILE"
+      ui_print "! $VAL is Unsupported"
+      ui_print "  in $FILE2"
     fi
+    ui_print ""
   fi
-  PROP=`grep_prop zram.prio $ZRAM`
-  if [ "$PROP" ]; then
-    ui_print "- Modifying Swap Priority $PROP..."
-    sed -i "s|PRIO=0|PRIO=$PROP|g" $MODPATH/service.sh
+  VAL=`grep_prop zram.prio $ZRAM`
+  if [ "$VAL" ]; then
+    ui_print "- Modifying Swap Priority to $VAL..."
+    sed -i "s|PRIO=|PRIO=$VAL|g" $MODPATH/service.sh
   else
     ui_print "- Modifying Swap Priority to 0..."
-    ui_print "- To 0..."
+    sed -i 's|PRIO=|PRIO=0|g' $MODPATH/service.sh
   fi
-fi
-PROP=`grep_prop zram.sflp $ZRAM`
-if [ "$PROP" ]; then
-  if [ "$PROP" -gt 100 ]; then
-    PROP=100
-  elif [ "$PROP" -lt 0 ]; then
-    unset PROP
-  fi
-fi
-if [ "$PROP" ]; then
-  ui_print "- Modifying swap_free_low_percentage..."
-  ui_print "- To $PROP"
-  sed -i "s|SFLP=0|SFLP=$PROP|g" $MODPATH/service.sh
-else
-  ui_print "- Modifying swap_free_low_percentage..."
-  ui_print "- To 0..."
-  ui_print "- Completed."
 fi
 
 # Completions
